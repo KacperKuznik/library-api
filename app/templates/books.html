@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% set view_value = view.value if view else "" %}
+{% if notice %}
+  <div class="alert alert--success" role="status">{{ notice }}</div>
+{% endif %}
+{% if error %}
+  <div class="alert alert--error" role="alert">{{ error }}</div>
+{% endif %}
+
+<section class="card">
+  <h2>Dodaj książkę</h2>
+  <form class="add-form" method="post" action="/ui/books">
+    <input type="hidden" name="view" value="{{ view_value }}">
+    <label>
+      Numer seryjny
+      <input name="serial_number" value="{{ form.serial_number }}" required
+             pattern="[0-9]{6}" maxlength="6" inputmode="numeric" placeholder="000000"
+             title="Dokładnie 6 cyfr">
+    </label>
+    <label>
+      Tytuł
+      <input name="title" value="{{ form.title }}" required maxlength="255">
+    </label>
+    <label>
+      Autor
+      <input name="author" value="{{ form.author }}" required maxlength="255">
+    </label>
+    <button class="button button--primary" type="submit">Dodaj</button>
+  </form>
+</section>
+
+<section class="card">
+  <nav class="tabs" aria-label="Filtr stanu">
+    {% for value, label in [(None, "Wszystkie"), ("available", "Dostępne"), ("borrowed", "Wypożyczone")] %}
+      <a class="tab {% if view == value %}tab--active{% endif %}"
+         href="/{% if value %}?status={{ value }}{% endif %}"
+         {% if view == value %}aria-current="page"{% endif %}>
+        {{ label }} <span class="tab__count">{{ counts[value] }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  {% if books %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nr seryjny</th>
+            <th>Tytuł</th>
+            <th>Autor</th>
+            <th>Stan</th>
+            <th>Wypożyczenie</th>
+            <th class="actions-col">Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for book in books %}
+            <tr>
+              <td class="mono">{{ book.serial_number }}</td>
+              <td>{{ book.title }}</td>
+              <td>{{ book.author }}</td>
+              <td>
+                {% if book.status == "borrowed" %}
+                  <span class="badge badge--borrowed">Wypożyczona</span>
+                {% else %}
+                  <span class="badge badge--available">Dostępna</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if book.borrowed_at %}
+                  karta <span class="mono">{{ book.borrower_card_number }}</span><br>
+                  <span class="muted">od {{ book.borrowed_at | local_time }}</span>
+                {% else %}
+                  <span class="muted">—</span>
+                {% endif %}
+              </td>
+              <td class="actions">
+                {% if book.status == "borrowed" %}
+                  <form method="post" action="/ui/books/{{ book.serial_number }}/return">
+                    <input type="hidden" name="view" value="{{ view_value }}">
+                    <button class="button" type="submit">Zwróć</button>
+                  </form>
+                {% else %}
+                  <form class="borrow-form" method="post" action="/ui/books/{{ book.serial_number }}/borrow">
+                    <input type="hidden" name="view" value="{{ view_value }}">
+                    <input name="borrower_card_number" required pattern="[0-9]{6}" maxlength="6"
+                           inputmode="numeric" placeholder="Nr karty" title="Dokładnie 6 cyfr"
+                           aria-label="Numer karty bibliotecznej dla książki {{ book.serial_number }}">
+                    <button class="button" type="submit">Wypożycz</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="/ui/books/{{ book.serial_number }}/delete"
+                      onsubmit="return confirm('Usunąć książkę {{ book.serial_number }}?')">
+                  <input type="hidden" name="view" value="{{ view_value }}">
+                  <button class="button button--danger" type="submit"
+                          {% if book.status == "borrowed" %}disabled title="Najpierw zarejestruj zwrot"{% endif %}>
+                    Usuń
+                  </button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">
+      {% if view %}Brak książek w tym widoku.{% else %}Brak książek. Dodaj pierwszą powyżej.{% endif %}
+    </p>
+  {% endif %}
+</section>
+{% endblock %}

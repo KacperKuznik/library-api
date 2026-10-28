@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: library
+      POSTGRES_PASSWORD: library
+      POSTGRES_DB: library
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U library
+      interval: 2s
+      retries: 30
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://library:library@db:5432/library
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Run with: docker compose --profile test run --rm tests
+  tests:
+    profiles: ["test"]
+    build: .
+    command: pytest -v
+    environment:
+      DATABASE_URL: postgresql+psycopg://library:library@test-db:5432/library
+    depends_on:
+      test-db:
+        condition: service_healthy
+
+  # Throwaway in-memory database, so tests never touch the real data.
+  test-db:
+    profiles: ["test"]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: library
+      POSTGRES_PASSWORD: library
+      POSTGRES_DB: library
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U library
+      interval: 2s
+      retries: 30
+
+volumes:
+  pgdata:
